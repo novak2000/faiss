@@ -57,8 +57,16 @@ size_t IndexFlatCodes::remove_ids(const IDSelector& sel) {
 }
 
 void IndexFlatCodes::reconstruct_n(idx_t i0, idx_t ni, float* recons) const {
-    FAISS_THROW_IF_NOT(ni == 0 || (i0 >= 0 && i0 + ni <= ntotal));
-    sa_decode(ni, codes.data() + i0 * code_size, recons);
+    printf("reconstruct\n");
+    if(use_mmap)
+    {
+        printf("using mmap decode\n");
+        sa_decode(ni, mmap_ptr + i0 * code_size, recons);
+    }
+    else{
+        FAISS_THROW_IF_NOT(ni == 0 || (i0 >= 0 && i0 + ni <= ntotal));
+        sa_decode(ni, codes.data() + i0 * code_size, recons);
+    }
 }
 
 void IndexFlatCodes::reconstruct(idx_t key, float* recons) const {

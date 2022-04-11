@@ -90,7 +90,9 @@ FlatCodesDistanceComputer* IndexScalarQuantizer::get_FlatCodesDistanceComputer()
     ScalarQuantizer::SQDistanceComputer* dc =
             sq.get_distance_computer(metric_type);
     dc->code_size = sq.code_size;
-    dc->codes = codes.data();
+    // printf("dajem mu pointer ka podacima\n");
+    if(use_mmap) dc->codes = mmap_ptr;
+    else dc->codes = codes.data();
     return dc;
 }
 

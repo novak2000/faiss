@@ -289,9 +289,9 @@ void IndexHNSW::search(
 {
     FAISS_THROW_IF_NOT(k > 0);
 
-    FAISS_THROW_IF_NOT_MSG(
-            storage,
-            "Please use IndexHNSWFlat (or variants) instead of IndexHNSW directly");
+    // FAISS_THROW_IF_NOT_MSG(
+    //         storage,
+    //         "Please use IndexHNSWFlat (or variants) instead of IndexHNSW directly");
     size_t n1 = 0, n2 = 0, n3 = 0, ndis = 0, nreorder = 0;
 
     idx_t check_period = InterruptCallback::get_period_hint(

@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -321,12 +322,55 @@ static void read_ScalarQuantizer(ScalarQuantizer* ivsc, IOReader* f) {
     ivsc->set_derived_sizes();
 }
 
-static void read_HNSW(HNSW* hnsw, IOReader* f) {
+static void read_HNSW(HNSW* hnsw, IOReader* f, int io_flags) {
     READVECTOR(hnsw->assign_probas);
     READVECTOR(hnsw->cum_nneighbor_per_level);
     READVECTOR(hnsw->levels);
     READVECTOR(hnsw->offsets);
-    READVECTOR(hnsw->neighbors);
+
+    
+    if((io_flags & IO_FLAG_MMAP_HNSW_NEIGHBORS) == IO_FLAG_MMAP_HNSW_NEIGHBORS)
+    {
+        // TODO mmap neighbors vektor
+        printf("koristice mmap za neighbor\n");
+        printf("%0x \n", io_flags);
+        hnsw->use_mmap=true;
+
+        size_t size;
+        READANDCHECK(&size, 1);
+
+        FileIOReader* reader = dynamic_cast<FileIOReader*>(f);
+        FAISS_THROW_IF_NOT_MSG(reader, "mmap only supported for File objects");
+        FILE* fdesc = reader->f;
+        size_t o0 = ftell(fdesc);
+        hnsw->neighbors_offset=o0;
+
+        struct stat buf;
+        int ret = fstat(fileno(fdesc), &buf);
+        FAISS_THROW_IF_NOT_FMT(ret == 0, "fstat failed: %s", strerror(errno));
+
+        void* tmp = mmap(
+                    nullptr,
+                    buf.st_size,
+                    PROT_READ,
+                    MAP_SHARED,
+                    fileno(fdesc),
+                    0);
+
+        FAISS_THROW_IF_NOT_FMT(
+                    tmp != MAP_FAILED, "could not mmap: %s", strerror(errno));
+
+        tmp = static_cast<char*>(tmp)+hnsw->neighbors_offset;
+        hnsw->neighbors_mmap_ptr = (int*)tmp;
+
+        FAISS_THROW_IF_NOT(size >= 0 && size < (uint64_t{1} << 40));
+        fseek(fdesc, size*sizeof(int), SEEK_CUR);
+    }
+    else
+    {
+        hnsw->use_mmap=false;
+        READVECTOR(hnsw->neighbors);
+    }
 
     READ1(hnsw->entry_point);
     READ1(hnsw->max_level);
@@ -677,7 +721,52 @@ Index* read_index(IOReader* f, int io_flags) {
         IndexScalarQuantizer* idxs = new IndexScalarQuantizer();
         read_index_header(idxs, f);
         read_ScalarQuantizer(&idxs->sq, f);
-        READVECTOR(idxs->codes);
+        
+        // TODO promeni
+        // ako je mmap flag stavi pointer, 
+
+        if(io_flags & IO_FLAG_MMAP_HNSW_VECTORS) //check for faiss.io_flag_mmap
+        {
+            // procitaj velicinu vektora pre mapiranja
+            size_t size;
+            READANDCHECK(&size, 1);
+            FAISS_THROW_IF_NOT(size >= 0 && size < (uint64_t{1} << 40));
+
+            idxs->use_mmap=true;
+            printf("koristi djovakov kod za mmap\n");
+            FileIOReader* reader = dynamic_cast<FileIOReader*>(f);
+            FAISS_THROW_IF_NOT_MSG(reader, "mmap only supported for File objects");
+            FILE* fdesc = reader->f;
+            size_t o0 = ftell(fdesc);
+            size_t o = o0;
+            { // do the mmap
+
+                struct stat buf;
+                int ret = fstat(fileno(fdesc), &buf);
+                FAISS_THROW_IF_NOT_FMT(ret == 0, "fstat failed: %s", strerror(errno));
+                // idxs->
+                idxs->mmap_ptr = (uint8_t*)mmap(
+                    nullptr,
+                    buf.st_size,
+                    PROT_READ,
+                    MAP_SHARED,
+                    fileno(fdesc),
+                    0);
+            
+                idxs->mmap_ptr_start=idxs->mmap_ptr;
+
+                FAISS_THROW_IF_NOT_FMT(
+                    idxs->mmap_ptr != MAP_FAILED, "could not mmap: %s", strerror(errno));
+                idxs->mmap_ptr += o0;
+                printf("uspesno upisao mmap pointer\n");
+            }
+        }
+        else
+        {
+            // kao sto je bilo ranije
+            READVECTOR(idxs->codes);
+            idxs->use_mmap=false;
+        }
         idxs->code_size = idxs->sq.code_size;
         idx = idxs;
     } else if (h == fourcc("IxLa")) {
@@ -821,7 +910,7 @@ Index* read_index(IOReader* f, int io_flags) {
         if (h == fourcc("IHN2"))
             idxhnsw = new IndexHNSW2Level();
         read_index_header(idxhnsw, f);
-        read_HNSW(&idxhnsw->hnsw, f);
+        read_HNSW(&idxhnsw->hnsw, f, io_flags);
         idxhnsw->storage = read_index(f, io_flags);
         idxhnsw->own_fields = true;
         if (h == fourcc("IHNp")) {
@@ -1026,7 +1115,7 @@ IndexBinary* read_index_binary(IOReader* f, int io_flags) {
     } else if (h == fourcc("IBHf")) {
         IndexBinaryHNSW* idxhnsw = new IndexBinaryHNSW();
         read_index_binary_header(idxhnsw, f);
-        read_HNSW(&idxhnsw->hnsw, f);
+        read_HNSW(&idxhnsw->hnsw, f, io_flags);
         idxhnsw->storage = read_index_binary(f, io_flags);
         idxhnsw->own_fields = true;
         idx = idxhnsw;

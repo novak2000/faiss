@@ -54,6 +54,12 @@ const int IO_FLAG_SKIP_IVF_DATA = 8;
 // OnDiskInvertedLists)
 const int IO_FLAG_MMAP = IO_FLAG_SKIP_IVF_DATA | 0x646f0000;
 
+//djovak hnsw memmap vectors flag
+const int IO_FLAG_MMAP_HNSW_VECTORS = 0x10000000;
+
+//djovak hnsw memmap neighbors data flag
+const int IO_FLAG_MMAP_HNSW_NEIGHBORS =  IO_FLAG_MMAP_HNSW_VECTORS | 0x08000000;
+
 Index* read_index(const char* fname, int io_flags = 0);
 Index* read_index(FILE* f, int io_flags = 0);
 Index* read_index(IOReader* reader, int io_flags = 0);

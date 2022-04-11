@@ -23,6 +23,11 @@ struct IndexFlatCodes : Index {
     /// encoded dataset, size ntotal * code_size
     std::vector<uint8_t> codes;
 
+    uint8_t* mmap_ptr;
+    uint8_t* mmap_ptr_start;
+    bool use_mmap;
+
+
     IndexFlatCodes();
 
     IndexFlatCodes(size_t code_size, idx_t d, MetricType metric = METRIC_L2);

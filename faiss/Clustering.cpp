@@ -444,12 +444,27 @@ void Clustering::train_encoded(
             double t0s = getmillisecs();
 
             if (!codec) {
-                index.search(
-                        nx,
-                        reinterpret_cast<const float*>(x),
-                        1,
-                        dis.get(),
-                        assign.get());
+                // index.search(
+                //         nx,
+                //         reinterpret_cast<const float*>(x),
+                //         1,
+                //         dis.get(),
+                //         assign.get());
+                for (size_t i0 = 0; i0 < nx; i0 += decode_block_size) {
+                    printf("iteracija %d od %d\n",(int)(i0/decode_block_size) , (int)(nx/decode_block_size));
+                    fflush(stdout);
+
+                    size_t i1 = i0 + decode_block_size;
+                    if (i1 > nx) {
+                        i1 = nx;
+                    }
+                    index.search(
+                            i1 - i0,
+                            reinterpret_cast<const float*>(x) + (512 * i0),
+                            1,
+                            dis.get() + i0,
+                            assign.get() + i0);
+                }
             } else {
                 // search by blocks of decode_block_size vectors
                 size_t code_size = codec->sa_code_size();

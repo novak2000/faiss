@@ -398,7 +398,11 @@ void greedy_update_nearest(
         size_t begin, end;
         hnsw.neighbor_range(nearest, level, &begin, &end);
         for (size_t i = begin; i < end; i++) {
-            storage_idx_t v = hnsw.neighbors[i];
+            storage_idx_t v;
+            
+            if(hnsw.use_mmap) v = *(hnsw.neighbors_mmap_ptr + i);
+            else v = hnsw.neighbors[i];
+
             if (v < 0)
                 break;
             float dis = qdis(v);
@@ -550,7 +554,11 @@ int HNSW::search_from_candidates(
         neighbor_range(v0, level, &begin, &end);
 
         for (size_t j = begin; j < end; j++) {
-            int v1 = neighbors[j];
+            int v1;
+
+            if(use_mmap) v1 = *(neighbors_mmap_ptr+j);
+            else v1 = neighbors[j];
+            
             if (v1 < 0)
                 break;
             if (vt.get(v1)) {
