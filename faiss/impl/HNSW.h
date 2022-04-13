@@ -114,9 +114,11 @@ struct HNSW {
     /// neighbors[offsets[i]:offsets[i+1]] is the list of neighbors of vector i
     /// for all levels. this is where all storage goes.
     std::vector<storage_idx_t> neighbors;
-    bool use_mmap;
+    bool use_mmap=false;
     size_t neighbors_offset;
     int* neighbors_mmap_ptr;
+
+    
     /// entry point in the search structure (one of the points with maximum
     /// level
     storage_idx_t entry_point;

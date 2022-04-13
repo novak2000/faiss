@@ -25,7 +25,7 @@ struct IndexFlatCodes : Index {
 
     uint8_t* mmap_ptr;
     uint8_t* mmap_ptr_start;
-    bool use_mmap;
+    bool use_mmap=false;
 
 
     IndexFlatCodes();
